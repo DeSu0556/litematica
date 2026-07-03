@@ -16,6 +16,8 @@ import fi.dy.masa.litematica.gui.Icons;
 import fi.dy.masa.litematica.materials.MaterialListBase;
 import fi.dy.masa.litematica.materials.MaterialListBase.SortCriteria;
 import fi.dy.masa.litematica.materials.MaterialListEntry;
+import fi.dy.masa.litematica.materials.MaterialListPlacement;
+import fi.dy.masa.litematica.materials.MaterialListSchematicReplacer;
 
 public class WidgetMaterialListEntry extends WidgetListEntrySortable<MaterialListEntry>
 {
@@ -71,7 +73,15 @@ public class WidgetMaterialListEntry extends WidgetListEntrySortable<MaterialLis
 
         // Note: These are placed from right to left
 
-        posX = this.createButtonGeneric(posX, posY, ButtonListener.ButtonType.IGNORE);
+        if (this.entry != null)
+        {
+            posX = this.createButtonGeneric(posX, posY, ButtonListener.ButtonType.IGNORE);
+
+            if (MaterialListSchematicReplacer.canReplaceEntry(this.materialList, this.entry))
+            {
+                this.createButtonGeneric(posX, posY, ButtonListener.ButtonType.REPLACE);
+            }
+        }
     }
 
     private int createButtonGeneric(int xRight, int y, ButtonListener.ButtonType type)
@@ -354,11 +364,20 @@ public class WidgetMaterialListEntry extends WidgetListEntrySortable<MaterialLis
 				this.materialList.ignoreEntry(this.entry);
 				this.listWidget.refreshEntries();
 			}
+            else if (this.type == ButtonType.REPLACE && this.materialList instanceof MaterialListPlacement list)
+            {
+                if (MaterialListSchematicReplacer.replaceMaterialWithHeldBlock(list, this.entry))
+                {
+                    this.materialList.reCreateMaterialList();
+                    this.listWidget.refreshEntries();
+                }
+            }
 		}
 
 		public enum ButtonType
 		{
-			IGNORE("litematica.gui.button.material_list.ignore");
+			IGNORE("litematica.gui.button.material_list.ignore"),
+            REPLACE("litematica.gui.button.material_list.replace");
 
 			private final String translationKey;
 
