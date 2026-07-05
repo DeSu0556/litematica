@@ -22,6 +22,7 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
@@ -797,14 +798,21 @@ public class WorldUtils
             if (stack.isEmpty() == false)
             {
                 BlockState stateClient = mc.level.getBlockState(pos);
+                boolean shouldWaterlog = EasyPlaceUtils.shouldWaterlogExistingBlock(stateSchematic, stateClient);
 
                 if (stateSchematic == stateClient)
                 {
                     return InteractionResult.FAIL;
                 }
 
+                if (shouldWaterlog)
+                {
+                    stack = new ItemStack(Items.WATER_BUCKET);
+                }
+
                 // Abort if there is already a block in the target position
-                if (easyPlaceBlockChecksCancel(stateSchematic, stateClient, mc.player, traceVanilla, stack))
+                if (shouldWaterlog == false &&
+                    easyPlaceBlockChecksCancel(stateSchematic, stateClient, mc.player, traceVanilla, stack))
                 {
                     return InteractionResult.FAIL;
                 }
@@ -818,9 +826,29 @@ public class WorldUtils
                     return InteractionResult.FAIL;
                 }
 
+                if (shouldWaterlog)
+                {
+                    Vec3 hitPos = new Vec3(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5);
+                    BlockHitResult hitResult = new BlockHitResult(hitPos, Direction.UP, pos, false);
+                    EasyPlaceUtils.cacheEasyPlacePosition(pos);
+                    return mc.gameMode.useItemOn(mc.player, hand, hitResult);
+                }
+
                 Vec3 hitPos = trace.getLocation();
                 Direction sideOrig = trace.getDirection();
                 EasyPlaceProtocol protocol = PlacementHandler.getEffectiveProtocolVersion();
+
+                if (stateSchematic.getBlock() instanceof RedStoneWireBlock)
+                {
+                    BlockPos supportPos = pos.below();
+
+                    if (mc.level.getBlockState(supportPos).canBeReplaced() == false)
+                    {
+                        pos = supportPos;
+                        sideOrig = Direction.UP;
+                        hitPos = new Vec3(pos.getX() + 0.5, pos.getY() + 1.0, pos.getZ() + 0.5);
+                    }
+                }
 
                 if (protocol == EasyPlaceProtocol.NONE || protocol == EasyPlaceProtocol.SLAB_ONLY)
                 {

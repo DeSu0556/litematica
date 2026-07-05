@@ -14,12 +14,14 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.*;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.ComparatorMode;
 import net.minecraft.world.level.block.state.properties.EnumProperty;
 import net.minecraft.world.level.block.state.properties.Half;
@@ -297,6 +299,11 @@ public class EasyPlaceUtils
                                                    BlockState stateSchematic,
                                                    BlockState stateClient)
     {
+        if (stateSchematic.getBlock() instanceof RedStoneWireBlock)
+        {
+            return getClickPositionForRedstoneWire(targetPosition);
+        }
+
         boolean isSlab = stateSchematic.getBlock() instanceof SlabBlock;
 
         if (isSlab)
@@ -309,6 +316,29 @@ public class EasyPlaceUtils
 //        boolean requireAdjacent = false;
 
         return requireAdjacent ? getAdjacentClickPosition(targetBlockPos) : targetPosition;
+    }
+
+    @Nullable
+    private static BlockHitResult getClickPositionForRedstoneWire(BlockHitResult targetPosition)
+    {
+        Minecraft mc = Minecraft.getInstance();
+        Level worldClient = mc.level;
+
+        if (worldClient == null)
+        {
+            return null;
+        }
+
+        BlockPos targetBlockPos = targetPosition.getBlockPos();
+        BlockPos supportPos = targetBlockPos.below();
+
+        if (PlacementUtils.isReplaceable(worldClient, supportPos, false))
+        {
+            return null;
+        }
+
+        Vec3 hitPos = new Vec3(supportPos.getX() + 0.5, supportPos.getY() + 1.0, supportPos.getZ() + 0.5);
+        return new BlockHitResult(hitPos, Direction.UP, supportPos, false);
     }
 
     @Nullable
@@ -475,7 +505,9 @@ public class EasyPlaceUtils
 		Level schematicWorld = SchematicWorldHandler.getSchematicWorld();
 		BlockState stateSchematic = schematicWorld.getBlockState(targetBlockPos);
 		BlockState stateClient = world.getBlockState(targetBlockPos);
-		ItemStack requiredStack = MaterialCache.getInstance().getRequiredBuildItemForState(stateSchematic, schematicWorld, targetBlockPos);
+		boolean shouldWaterlog = shouldWaterlogExistingBlock(stateSchematic, stateClient);
+		ItemStack requiredStack = shouldWaterlog ? new ItemStack(Items.WATER_BUCKET) :
+				MaterialCache.getInstance().getRequiredBuildItemForState(stateSchematic, schematicWorld, targetBlockPos);
 
 		if (stateSchematic.is(BlockTags.AIR))
 		{
@@ -503,6 +535,13 @@ public class EasyPlaceUtils
 		if (clickPosition == null || hand == null)
 		{
 			return InteractionResult.FAIL;
+		}
+
+		if (shouldWaterlog)
+		{
+			BlockHitResult hitResult = getWaterloggingClickPosition(targetBlockPos);
+			cacheEasyPlacePosition(targetBlockPos);
+			return mc.gameMode.useItemOn(mc.player, hand, hitResult);
 		}
 
 		// *** ADDED Easy Place Code from Pre-Rewrite ***
@@ -690,6 +729,11 @@ public class EasyPlaceUtils
 
     private static boolean canPlaceBlock(BlockPos targetPos, Level worldClient, BlockState stateSchematic, BlockState stateClient)
     {
+        if (shouldWaterlogExistingBlock(stateSchematic, stateClient))
+        {
+            return true;
+        }
+
         boolean isSlab = stateSchematic.getBlock() instanceof SlabBlock;
 
         if (isSlab)
@@ -705,6 +749,27 @@ public class EasyPlaceUtils
         }
 
         return PlacementUtils.isReplaceable(worldClient, targetPos, true);
+    }
+
+    static boolean shouldWaterlogExistingBlock(BlockState stateSchematic, BlockState stateClient)
+    {
+        if (stateSchematic.getBlock() != stateClient.getBlock() ||
+            stateSchematic.hasProperty(BlockStateProperties.WATERLOGGED) == false ||
+            stateClient.hasProperty(BlockStateProperties.WATERLOGGED) == false ||
+            stateSchematic.getValue(BlockStateProperties.WATERLOGGED) == false ||
+            stateClient.getValue(BlockStateProperties.WATERLOGGED))
+        {
+            return false;
+        }
+
+        return stateSchematic.setValue(BlockStateProperties.WATERLOGGED, false) ==
+               stateClient.setValue(BlockStateProperties.WATERLOGGED, false);
+    }
+
+    private static BlockHitResult getWaterloggingClickPosition(BlockPos targetBlockPos)
+    {
+        Vec3 hitPos = new Vec3(targetBlockPos.getX() + 0.5, targetBlockPos.getY() + 0.5, targetBlockPos.getZ() + 0.5);
+        return new BlockHitResult(hitPos, Direction.UP, targetBlockPos, false);
     }
 
     private static Vec3 applyCarpetProtocolHitVec(BlockPos pos, BlockState state, Vec3 hitVecIn)
