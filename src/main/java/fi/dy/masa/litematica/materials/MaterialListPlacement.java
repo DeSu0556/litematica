@@ -35,6 +35,11 @@ public class MaterialListPlacement extends MaterialListBase
         return true;
     }
 
+    public SchematicPlacement getPlacement()
+    {
+        return this.placement;
+    }
+
     @Override
     public String getName()
     {

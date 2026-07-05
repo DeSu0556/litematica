@@ -1026,7 +1026,7 @@ public class SchematicUtils
     }
 
     @Nullable
-    private static BlockPos getReverserTransformedWorldPosition(BlockPos worldPos, LitematicaSchematic schematic,
+    public static BlockPos getReverserTransformedWorldPosition(BlockPos worldPos, LitematicaSchematic schematic,
             String regionName, SchematicPlacement schematicPlacement, SubRegionPlacement regionPlacement)
     {
         BlockPos origin = schematicPlacement.getOrigin();
